@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NEXUS AI</title>
+<style>
+:root{color-scheme:dark;--bg:#080b16;--panel:#11172a;--line:#252e49;--cyan:#55d9ff;--purple:#a78bfa;--muted:#9aa7c5}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 50% -20%,#1b2850 0,transparent 55%),var(--bg);color:#f4f7ff;font:15px Inter,system-ui,sans-serif;min-height:100vh}
+header{height:70px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 5vw}
+.brand{font-size:21px;font-weight:800;letter-spacing:3px}.brand span{color:var(--cyan)}.status{color:#8fe5bb;font-size:12px}
+main{max-width:1000px;margin:32px auto;padding:0 18px;display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:18px}
+.panel{background:#101629eF;border:1px solid var(--line);border-radius:18px;overflow:hidden}.chat-head,.memory-head{padding:18px 20px;border-bottom:1px solid var(--line);font-weight:700}
+#messages{height:58vh;min-height:340px;overflow:auto;padding:20px;display:flex;flex-direction:column;gap:14px}
+.msg{max-width:85%;padding:13px 15px;border-radius:14px;white-space:pre-wrap;line-height:1.5}.user{align-self:flex-end;background:#263b66}.assistant{align-self:flex-start;background:#1a2238;border:1px solid #2b3654}
+.composer{display:flex;gap:9px;padding:14px;border-top:1px solid var(--line)}input,textarea{width:100%;background:#0b1020;border:1px solid var(--line);border-radius:11px;color:white;padding:12px;font:inherit;outline:none}input:focus,textarea:focus{border-color:var(--cyan)}button{border:0;border-radius:11px;background:linear-gradient(120deg,#28bfe8,#8067ed);color:#07101e;font-weight:800;padding:0 18px;cursor:pointer}button:disabled{opacity:.5;cursor:wait}
+aside{padding-bottom:14px}.memory-copy{padding:14px 16px;color:var(--muted);font-size:13px;line-height:1.5}.savebox{padding:0 14px 14px;display:grid;gap:9px}.savebox button{padding:11px}.memory-list{padding:0 14px;display:grid;gap:9px}.memory{background:#1a2238;border:1px solid #2b3654;padding:10px;border-radius:10px;font-size:13px;display:flex;gap:8px;align-items:flex-start}.memory span{flex:1;overflow-wrap:anywhere}.memory button{padding:3px 8px;background:#3a2942;color:#ffc5d7}.empty{color:#8290af;font-size:13px;padding:4px}
+.note{font-size:11px;color:#7886a5;padding:14px 16px;line-height:1.5}
+@media(max-width:760px){main{grid-template-columns:1fr;margin:18px auto}#messages{height:48vh;min-height:280px}header{padding:0 18px}}
+</style></head>
+<body>
+<header><div class="brand">NEXUS <span>AI</span></div><div class="status">● MEMORY ENABLED</div></header>
+<main>
+<section class="panel"><div class="chat-head">Your AI assistant</div><div id="messages"><div class="msg assistant">Hey! I'm NEXUS. I can use saved memories to personalize future chats. Add something in the Memory panel that you'd like me to remember.</div></div>
+<form class="composer" id="chat-form"><input id="prompt" autocomplete="off" placeholder="Message NEXUS..." maxlength="12000" required><button id="send">Send</button></form></section>
+<aside class="panel"><div class="memory-head">Your memories</div><div class="memory-copy">Save preferences or useful details here. NEXUS will receive these memories in future chats from this browser.</div>
+<form class="savebox" id="memory-form"><input id="memory-input" maxlength="500" placeholder="e.g. I prefer Python..." required><button id="save">Save memory</button></form>
+<div class="memory-list" id="memory-list"><div class="empty">Loading memories...</div></div>
+<div class="note">Memory is tied to this browser. Do not save passwords or highly sensitive information. On free hosts, local database files may be erased during restarts or redeploys unless persistent storage is configured.</div>
+</aside>
+</main>
+<script>
+const $=s=>document.querySelector(s);
+let clientId=localStorage.getItem("nexus-client-id");
+if(!clientId){clientId=crypto.randomUUID();localStorage.setItem("nexus-client-id",clientId)}
+let history=[];
+function addMessage(role,content){const el=document.createElement("div");el.className="msg "+role;el.textContent=content;$("#messages").append(el);$("#messages").scrollTop=$("#messages").scrollHeight}
+async function loadMemories(){try{const r=await fetch("/api/memories?client_id="+encodeURIComponent(clientId));if(!r.ok)throw new Error("Could not load memories");const data=await r.json();const list=$("#memory-list");list.replaceChildren();if(!data.memories.length){const e=document.createElement("div");e.className="empty";e.textContent="No saved memories yet.";list.append(e);return}for(const m of data.memories){const item=document.createElement("div");item.className="memory";const label=document.createElement("span");label.textContent=m.content;const del=document.createElement("button");del.type="button";del.textContent="×";del.title="Delete memory";del.onclick=async()=>{await fetch("/api/memories/"+m.id+"?client_id="+encodeURIComponent(clientId),{method:"DELETE"});loadMemories()};item.append(label,del);list.append(item)}}catch(e){$("#memory-list").textContent=e.message}}
+$("#memory-form").addEventListener("submit",async e=>{e.preventDefault();const input=$("#memory-input"),button=$("#save");button.disabled=true;try{const r=await fetch("/api/memories",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({client_id:clientId,content:input.value})});const data=await r.json();if(!r.ok)throw new Error(data.detail||"Could not save memory");input.value="";await loadMemories();addMessage("assistant","I'll use that memory in future chats.");}catch(err){alert(err.message)}finally{button.disabled=false}});
+$("#chat-form").addEventListener("submit",async e=>{e.preventDefault();const input=$("#prompt"),button=$("#send"),content=input.value.trim();if(!content)return;input.value="";history.push({role:"user",content});addMessage("user",content);button.disabled=true;try{const r=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({client_id:clientId,messages:history})});const data=await r.json();if(!r.ok)throw new Error(data.detail||"Request failed");history.push({role:"assistant",content:data.reply});addMessage("assistant",data.reply)}catch(err){addMessage("assistant","Sorry — "+err.message);history.pop()}finally{button.disabled=false;input.focus()}});
+loadMemories();
+</script></body></html>
