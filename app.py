@@ -10,7 +10,7 @@ from typing import Literal
 
 import httpx
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import FastAPI, File, HTTPException, Request, Response, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
@@ -158,7 +158,7 @@ def health():
 
 
 @app.post("/api/auth/signup")
-def signup(body: Credentials, response):
+def signup(body: Credentials, response: Response):
     email = body.email.strip().lower()
     if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email):
         raise HTTPException(400, "Enter a valid email address.")
@@ -176,7 +176,7 @@ def signup(body: Credentials, response):
 
 
 @app.post("/api/auth/login")
-def login(body: Credentials, response):
+def login(body: Credentials, response: Response):
     with db_conn() as db:
         user = db.execute("SELECT id,email,password_hash FROM users WHERE email=?",
                           (body.email.strip().lower(),)).fetchone()
@@ -193,7 +193,7 @@ def me(request: Request):
 
 
 @app.post("/api/auth/logout")
-def logout(response):
+def logout(response: Response):
     response.delete_cookie(COOKIE_NAME, path="/", httponly=True, secure=COOKIE_SECURE, samesite="lax")
     return {"ok": True}
 
