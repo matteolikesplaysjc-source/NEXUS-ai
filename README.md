@@ -1,43 +1,45 @@
-# NEXUS AI v3
+# NEXUS AI
 
-A personal AI chat web app with accounts, saved memory, persistent chat history, document uploads, and browser voice features.
-
-## Features
-- Email + password accounts; passwords are hashed with PBKDF2-HMAC-SHA256.
-- Signed, HTTP-only session cookie.
-- User-owned long-term memories: create, edit, and delete.
-- Conversations and messages stored in SQLite and restored after refresh.
-- Upload TXT, Markdown, CSV, JSON, and PDF files (up to 5 MB each); text is extracted and added as context to a chat.
-- Voice input using the browser Speech Recognition API when supported; spoken answers using Speech Synthesis.
-- Groq API integration with configurable model; API key remains on the server.
+NEXUS is a FastAPI-powered AI chat workspace with account sign-up/sign-in, saved conversations, editable memories, and text/Markdown/CSV/JSON/PDF uploads. AI responses use the Groq API; the API key stays on the server.
 
 ## Run locally (Windows)
-1. Install Python 3.11+.
-2. In this folder, run:
+
+1. Install Python 3.11 or newer.
+2. Download/clone this repository and open a terminal in its folder.
+3. Create and activate a virtual environment:
    ```powershell
    py -m venv .venv
    .venv\Scripts\Activate.ps1
    pip install -r requirements.txt
    Copy-Item .env.example .env
    ```
-3. Edit `.env` and set `GROQ_API_KEY` and a long random `NEXUS_SECRET_KEY`.
-4. Run `uvicorn app:app --reload`.
-5. Open http://127.0.0.1:8000.
+4. Edit `.env` and set:
+   - `GROQ_API_KEY` to your private provider key.
+   - `NEXUS_SECRET_KEY` to a long random secret string.
+   - Keep `COOKIE_SECURE=false` for local HTTP testing.
+5. Start NEXUS:
+   ```powershell
+   uvicorn app:app --reload
+   ```
+6. Open http://127.0.0.1:8000.
 
-## Deploy
-- Build: `pip install -r requirements.txt`
-- Start: `uvicorn app:app --host 0.0.0.0 --port $PORT`
-- Add `GROQ_API_KEY`, `NEXUS_SECRET_KEY`, and `GROQ_MODEL` as private environment variables.
-- Attach persistent storage and set `NEXUS_DB_PATH` and `NEXUS_UPLOAD_DIR` to paths on it.
-- Set `COOKIE_SECURE=true` when using HTTPS.
-- Ensure the host's storage is backed up; SQLite and uploaded files are stored on disk.
+## Deploy on Render
 
-## Important setup notes
-- The default model is `openai/gpt-oss-120b` on Groq. Set `GROQ_MODEL` to another model currently enabled for your Groq account if needed. Model availability and pricing are controlled by the provider.
-- Voice input depends on browser support for the Web Speech API and may require microphone permission. Spoken output uses the browser's speech engine.
-- PDF text extraction works for text-based PDFs, not scanned image-only PDFs.
-- This starter account system does not include email verification, password reset, MFA, or social login. Add those before using it for a public production service.
-- Use HTTPS in production. Do not commit real API keys or secret keys.
+1. In Render, create a **Web Service** and connect this repository.
+2. Render should detect the included `render.yaml`; if configuring manually, use:
+   - Build command: `pip install -r requirements.txt`
+   - Start command: `uvicorn app:app --host 0.0.0.0 --port $PORT`
+3. Add private environment variables in Render:
+   - `GROQ_API_KEY`: your provider key.
+   - `NEXUS_SECRET_KEY`: a long, randomly generated secret. Do not commit it.
+   - `COOKIE_SECURE`: `true` for HTTPS deployment.
+4. Deploy, then open the HTTPS URL Render gives your service.
 
-## Existing data
-The v3 schema creates new account-based tables. The old anonymous browser-ID memories are not automatically migrated into accounts. Back up your database before deploying schema changes.
+The `/health` endpoint can be used for health checks.
+
+## Important deployment notes
+
+- **Never commit a real `.env` file or API key.** The provided `.gitignore` excludes `.env`, virtual environments, and the local `data/` folder.
+- The app stores accounts, conversations, memories, and uploads in SQLite/local files. On a free host, that data may be lost during redeploys or restarts. Use persistent storage or a managed database before relying on it for long-term data.
+- Before opening the app to the public, consider rate limits, abuse protection, backups, privacy disclosures, and monitoring.
+- A working website also requires a valid provider key and available model/usage quota. GitHub stores the source code; it does not host the running AI service by itself.
